@@ -1,4 +1,4 @@
-name: Build Hybrid ksu_susfs (Official GitLab Source)
+name: Build Hybrid ksu_susfs (Auto-Find Script)
 
 on:
   workflow_dispatch:
@@ -8,51 +8,74 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Manually Clone from Official GitLab
-    # We use 'git clone' because the official source is on GitLab, not GitHub.
+    # 1. Clone Source
     - name: Clone Source Code
       run: |
         git clone https://gitlab.com/simonpunk/susfs4ksu.git .
-        # Checkout the specific branch for Android 13 Kernel 5.15
         git checkout gki-android13-5.15
 
-    # 2. Setup Android NDK
+    # 2. Setup NDK
     - name: Setup Android NDK
       uses: nttld/setup-ndk@v1
       with:
         ndk-version: r27
 
-    # 3. Install Stealth Tool (UPX)
+    # 3. Install UPX
     - name: Install UPX
       run: |
         sudo apt-get update
         sudo apt-get install -y upx
 
-    # 4. Compile the Binary
+    # 4. Find and Compile (The Fix)
     - name: Compile ksu_susfs
       run: |
-        cd ksu_module_susfs
-        # Grant permission to the build script
-        chmod +x build_ksu_susfs_tool.sh
-        ./build_ksu_susfs_tool.sh
+        # List all files to debug (in case it fails again)
+        echo "Listing all files:"
+        ls -R
+        
+        # Go into the module folder if it exists
+        if [ -d "ksu_module_susfs" ]; then
+          cd ksu_module_susfs
+        fi
+        
+        # Check if the script is here, if not, try the 'tools' folder
+        if [ -f "build_ksu_susfs_tool.sh" ]; then
+           chmod +x build_ksu_susfs_tool.sh
+           ./build_ksu_susfs_tool.sh
+        elif [ -f "tools/build_ksu_susfs_tool.sh" ]; then
+           cd tools
+           chmod +x build_ksu_susfs_tool.sh
+           ./build_ksu_susfs_tool.sh
+           # Move back up for the next steps
+           cd ..
+        else
+           echo "ERROR: Could not find build_ksu_susfs_tool.sh"
+           exit 1
+        fi
 
-    # 5. Apply "Hybrid" Stealth (UPX Pack)
+    # 5. Apply Stealth (UPX Pack)
     - name: Create Hybrid (UPX Pack)
       run: |
-        cd ksu_module_susfs/tools
+        # Find the compiled binary
+        # It is usually in ksu_module_susfs/tools/ksu_susfs_arm64 or just tools/
         
-        echo "Original Size:"
-        ls -lh ksu_susfs_arm64
+        TARGET_FILE=$(find . -name ksu_susfs_arm64 | head -n 1)
         
-        # Pack the binary to make it invisible to Native Detector
-        upx --best ksu_susfs_arm64 -o ksu_susfs
+        if [ -z "$TARGET_FILE" ]; then
+           echo "ERROR: Compiled binary not found!"
+           exit 1
+        fi
         
-        echo "Hybrid Size:"
-        ls -lh ksu_susfs
+        echo "Found binary at: $TARGET_FILE"
+        
+        # Pack it
+        upx --best "$TARGET_FILE" -o ksu_susfs_hybrid
+        
+        ls -lh ksu_susfs_hybrid
 
-    # 6. Upload the Result
+    # 6. Upload
     - name: Upload Hybrid Binary
       uses: actions/upload-artifact@v4
       with:
         name: ksu_susfs_hybrid_final
-        path: ksu_module_susfs/tools/ksu_susfs
+        path: ksu_susfs_hybrid
