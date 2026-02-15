@@ -1,0 +1,58 @@
+name: Build Hybrid ksu_susfs (Android 13 Fix)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Get the Source Code for Android 13
+    # CRITICAL CHANGE: We use 'gki-android13-5.15' here
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        repository: 'Star-Seven/susfs4ksu'
+        ref: 'gki-android13-5.15'
+
+    # 2. Setup Build Tools
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r27
+
+    # 3. Install Stealth Tool (UPX)
+    - name: Install UPX
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y upx
+
+    # 4. Compile the Compatible Binary
+    - name: Compile ksu_susfs
+      run: |
+        cd ksu_module_susfs
+        # This builds the raw binary compatible with ReSukiSU App
+        ./build_ksu_susfs_tool.sh
+
+    # 5. Apply Stealth (The "Hybrid" Step)
+    - name: Create Hybrid (UPX Pack)
+      run: |
+        cd ksu_module_susfs/tools
+        
+        # Verify original size
+        ls -lh ksu_susfs_arm64
+        
+        # Pack the binary to hide it from Native Detector
+        # This gives you: App Compatibility + Detection Bypass
+        upx --best ksu_susfs_arm64 -o ksu_susfs
+        
+        # Verify packed size (should be much smaller)
+        ls -lh ksu_susfs
+
+    # 6. Upload the Result
+    - name: Upload Hybrid Binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: ksu_susfs_hybrid_android13
+        path: ksu_module_susfs/tools/ksu_susfs
