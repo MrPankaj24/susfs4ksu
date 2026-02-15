@@ -1,4 +1,4 @@
-name: Build Hybrid ksu_susfs (Auto-Find Script)
+name: Build Hybrid ksu_susfs (Final Fix)
 
 on:
   workflow_dispatch:
@@ -8,13 +8,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Clone Source
+    # 1. Clone the Source
     - name: Clone Source Code
       run: |
         git clone https://gitlab.com/simonpunk/susfs4ksu.git .
         git checkout gki-android13-5.15
 
-    # 2. Setup NDK
+    # 2. Setup Android NDK
     - name: Setup Android NDK
       uses: nttld/setup-ndk@v1
       with:
@@ -26,56 +26,32 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y upx
 
-    # 4. Find and Compile (The Fix)
+    # 4. Compile (Run script from Root)
     - name: Compile ksu_susfs
       run: |
-        # List all files to debug (in case it fails again)
-        echo "Listing all files:"
-        ls -R
-        
-        # Go into the module folder if it exists
-        if [ -d "ksu_module_susfs" ]; then
-          cd ksu_module_susfs
-        fi
-        
-        # Check if the script is here, if not, try the 'tools' folder
-        if [ -f "build_ksu_susfs_tool.sh" ]; then
-           chmod +x build_ksu_susfs_tool.sh
-           ./build_ksu_susfs_tool.sh
-        elif [ -f "tools/build_ksu_susfs_tool.sh" ]; then
-           cd tools
-           chmod +x build_ksu_susfs_tool.sh
-           ./build_ksu_susfs_tool.sh
-           # Move back up for the next steps
-           cd ..
-        else
-           echo "ERROR: Could not find build_ksu_susfs_tool.sh"
-           exit 1
-        fi
+        # The logs proved the script is in the root folder.
+        # We simply give it permission and run it.
+        chmod +x build_ksu_susfs_tool.sh
+        ./build_ksu_susfs_tool.sh
 
     # 5. Apply Stealth (UPX Pack)
     - name: Create Hybrid (UPX Pack)
       run: |
-        # Find the compiled binary
-        # It is usually in ksu_module_susfs/tools/ksu_susfs_arm64 or just tools/
+        # The compiled file always lands here after the script runs
+        cd ksu_module_susfs/tools
         
-        TARGET_FILE=$(find . -name ksu_susfs_arm64 | head -n 1)
+        echo "Original Size:"
+        ls -lh ksu_susfs_arm64
         
-        if [ -z "$TARGET_FILE" ]; then
-           echo "ERROR: Compiled binary not found!"
-           exit 1
-        fi
+        # Pack it to make it invisible to Native Detector
+        upx --best ksu_susfs_arm64 -o ksu_susfs
         
-        echo "Found binary at: $TARGET_FILE"
-        
-        # Pack it
-        upx --best "$TARGET_FILE" -o ksu_susfs_hybrid
-        
-        ls -lh ksu_susfs_hybrid
+        echo "Hybrid Size:"
+        ls -lh ksu_susfs
 
     # 6. Upload
     - name: Upload Hybrid Binary
       uses: actions/upload-artifact@v4
       with:
         name: ksu_susfs_hybrid_final
-        path: ksu_susfs_hybrid
+        path: ksu_module_susfs/tools/ksu_susfs
