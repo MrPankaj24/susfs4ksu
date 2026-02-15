@@ -1,4 +1,4 @@
-name: Build Hybrid ksu_susfs (Android 13 Fix)
+name: Build Hybrid ksu_susfs (Samsung M14 - Android 13)
 
 on:
   workflow_dispatch:
@@ -8,51 +8,51 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Get the Source Code for Android 13
-    # CRITICAL CHANGE: We use 'gki-android13-5.15' here
+    # 1. Checkout the CORRECT Source for your Device
+    # We use 'gki-android13-5.15' because your Samsung M14 is on Kernel 5.15
     - name: Checkout Code
       uses: actions/checkout@v4
       with:
         repository: 'Star-Seven/susfs4ksu'
         ref: 'gki-android13-5.15'
 
-    # 2. Setup Build Tools
+    # 2. Setup Android NDK (The Compiler)
     - name: Setup Android NDK
       uses: nttld/setup-ndk@v1
       with:
         ndk-version: r27
 
-    # 3. Install Stealth Tool (UPX)
+    # 3. Install UPX (The Stealth Tool)
     - name: Install UPX
       run: |
         sudo apt-get update
         sudo apt-get install -y upx
 
     # 4. Compile the Compatible Binary
+    # This ensures it works with your ReSukiSU App
     - name: Compile ksu_susfs
       run: |
         cd ksu_module_susfs
-        # This builds the raw binary compatible with ReSukiSU App
         ./build_ksu_susfs_tool.sh
 
-    # 5. Apply Stealth (The "Hybrid" Step)
+    # 5. Apply "Hybrid" Stealth (UPX Pack)
+    # This hides the binary from Native Detector
     - name: Create Hybrid (UPX Pack)
       run: |
         cd ksu_module_susfs/tools
         
-        # Verify original size
+        echo "Original Size (Compatible):"
         ls -lh ksu_susfs_arm64
         
-        # Pack the binary to hide it from Native Detector
-        # This gives you: App Compatibility + Detection Bypass
+        # The Magic Step: Compress and Obfuscate
         upx --best ksu_susfs_arm64 -o ksu_susfs
         
-        # Verify packed size (should be much smaller)
+        echo "Hybrid Size (Stealth):"
         ls -lh ksu_susfs
 
-    # 6. Upload the Result
+    # 6. Upload the Final File
     - name: Upload Hybrid Binary
       uses: actions/upload-artifact@v4
       with:
-        name: ksu_susfs_hybrid_android13
+        name: ksu_susfs_hybrid_final
         path: ksu_module_susfs/tools/ksu_susfs
