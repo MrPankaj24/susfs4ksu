@@ -1,4 +1,4 @@
-name: Build Hybrid ksu_susfs (Samsung M14 - Android 13)
+name: Build Hybrid ksu_susfs (Official GitLab Source)
 
 on:
   workflow_dispatch:
@@ -8,49 +8,49 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Checkout the CORRECT Source for your Device
-    # We use 'gki-android13-5.15' because your Samsung M14 is on Kernel 5.15
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      with:
-        repository: 'Star-Seven/susfs4ksu'
-        ref: 'gki-android13-5.15'
+    # 1. Manually Clone from Official GitLab
+    # We use 'git clone' because the official source is on GitLab, not GitHub.
+    - name: Clone Source Code
+      run: |
+        git clone https://gitlab.com/simonpunk/susfs4ksu.git .
+        # Checkout the specific branch for Android 13 Kernel 5.15
+        git checkout gki-android13-5.15
 
-    # 2. Setup Android NDK (The Compiler)
+    # 2. Setup Android NDK
     - name: Setup Android NDK
       uses: nttld/setup-ndk@v1
       with:
         ndk-version: r27
 
-    # 3. Install UPX (The Stealth Tool)
+    # 3. Install Stealth Tool (UPX)
     - name: Install UPX
       run: |
         sudo apt-get update
         sudo apt-get install -y upx
 
-    # 4. Compile the Compatible Binary
-    # This ensures it works with your ReSukiSU App
+    # 4. Compile the Binary
     - name: Compile ksu_susfs
       run: |
         cd ksu_module_susfs
+        # Grant permission to the build script
+        chmod +x build_ksu_susfs_tool.sh
         ./build_ksu_susfs_tool.sh
 
     # 5. Apply "Hybrid" Stealth (UPX Pack)
-    # This hides the binary from Native Detector
     - name: Create Hybrid (UPX Pack)
       run: |
         cd ksu_module_susfs/tools
         
-        echo "Original Size (Compatible):"
+        echo "Original Size:"
         ls -lh ksu_susfs_arm64
         
-        # The Magic Step: Compress and Obfuscate
+        # Pack the binary to make it invisible to Native Detector
         upx --best ksu_susfs_arm64 -o ksu_susfs
         
-        echo "Hybrid Size (Stealth):"
+        echo "Hybrid Size:"
         ls -lh ksu_susfs
 
-    # 6. Upload the Final File
+    # 6. Upload the Result
     - name: Upload Hybrid Binary
       uses: actions/upload-artifact@v4
       with:
